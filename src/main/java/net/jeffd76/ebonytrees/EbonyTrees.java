@@ -1,8 +1,11 @@
 package net.jeffd76.ebonytrees;
 
 import com.mojang.logging.LogUtils;
+import net.jeffd76.ebonytrees.block.ModBlocks;
 import net.jeffd76.ebonytrees.item.ModCreativeModeTabs;
 import net.jeffd76.ebonytrees.item.ModItems;
+import net.jeffd76.ebonytrees.util.ModWoodTypes;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraftforge.api.distmarker.Dist;
@@ -23,8 +26,7 @@ import org.slf4j.Logger;
 public class EbonyTrees {
 
     public static final String MOD_ID = "ebonytrees";
-
-    private static final Logger LOGGER = LogUtils.getLogger();
+    public static final Logger LOGGER = LogUtils.getLogger();
 
     public EbonyTrees(FMLJavaModLoadingContext context)
     {
@@ -33,6 +35,9 @@ public class EbonyTrees {
         ModCreativeModeTabs.register(modEventBus);
 
         ModItems.register(modEventBus);
+        ModBlocks.register(modEventBus);
+
+
 
         modEventBus.addListener(this::commonSetup);
 
@@ -64,6 +69,8 @@ public class EbonyTrees {
     public static class ClientModEvents {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event){
+            Sheets.addWoodType(ModWoodTypes.EBONY);
+
 
         }
     }

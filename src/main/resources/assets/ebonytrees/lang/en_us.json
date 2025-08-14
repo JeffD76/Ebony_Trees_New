@@ -1,4 +1,21 @@
 {
   "item.ebonytrees.ebony_sapling": "Ebony Sapling",
-  "creativetab.ebony_trees_tab": "Ebony Trees Tab"
+
+  "creativetab.ebony_trees_tab": "Ebony Trees Tab",
+
+  "block.ebonytrees.ebony_log": "Ebony Log",
+  "block.ebonytrees.ebony_wood": "Ebony Wood",
+  "block.ebonytrees.stripped_ebony_log": "Stripped Ebony Log",
+  "block.ebonytrees.stripped_ebony_wood": "Stripped Ebony Wood",
+  "block.ebonytrees.ebony_planks": "Ebony Planks",
+  "block.ebonytrees.ebony_leaves": "Ebony Leaves"
+
+  "block.ebonytrees.ebony_stairs": "Ebony Stairs"
+  "block.ebonytrees.ebony_slab": "Ebony Slab"
+  "block.ebonytrees.ebony_button": "Ebony Button"
+  "block.ebonytrees.ebony_pressure_plate": "Ebony Pressure Plate"
+  "block.ebonytrees.ebony_fence": "Ebony Fence"
+  "block.ebonytrees.ebony_fence_gate": "Ebony Fence Gate"
+  "block.ebonytrees.ebony_door": "Ebony Door"
+  "block.ebonytrees.ebony_trapdoor": "Ebony Trapdoor"
 }
