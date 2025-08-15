@@ -2,8 +2,11 @@ package net.jeffd76.ebonytrees;
 
 import com.mojang.logging.LogUtils;
 import net.jeffd76.ebonytrees.block.ModBlocks;
+import net.jeffd76.ebonytrees.block.entity.ModBlockEntities;
 import net.jeffd76.ebonytrees.item.ModCreativeModeTabs;
 import net.jeffd76.ebonytrees.item.ModItems;
+import net.jeffd76.ebonytrees.loot.ModLootModifiers;
+import net.jeffd76.ebonytrees.recipe.ModRecipes;
 import net.jeffd76.ebonytrees.util.ModWoodTypes;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.world.item.CreativeModeTab;
@@ -37,7 +40,10 @@ public class EbonyTrees {
         ModItems.register(modEventBus);
         ModBlocks.register(modEventBus);
 
+        ModLootModifiers.register(modEventBus);
 
+        ModBlockEntities.register(modEventBus);
+        ModRecipes.register(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
 
@@ -54,7 +60,7 @@ public class EbonyTrees {
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
 
         if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
-            event.accept(ModItems.EBONY_SAPLING);
+
         }
     }
 

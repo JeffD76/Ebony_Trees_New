@@ -1,7 +1,7 @@
 package net.jeffd76.ebonytrees.event;
 
 import net.jeffd76.ebonytrees.EbonyTrees;
-import net.jeffd76.ebonytrees.block.ModBlocks;
+import net.jeffd76.ebonytrees.block.entity.ModBlockEntities;
 import net.minecraft.client.renderer.blockentity.HangingSignRenderer;
 import net.minecraft.client.renderer.blockentity.SignRenderer;
 import net.minecraftforge.api.distmarker.Dist;
@@ -13,10 +13,9 @@ import net.minecraftforge.fml.common.Mod;
 public class ModEventBusClientEvents {
 
     @SubscribeEvent
-    public static void registerBER(EntityRenderersEvent.RegisterLayerDefinitions event) {
+    public static void registerBER(EntityRenderersEvent.RegisterRenderers event) {
 
-        event.registerBlockEntityRenderer(ModBlocks.MOD_SIGN.get(), SignRenderer::new);
-        event.registerBlockEntityRenderer(ModBlocks.MOD_HANGING_SIGN.get(), HangingSignRenderer::new);
-
+        event.registerBlockEntityRenderer(ModBlockEntities.MOD_SIGN.get(), SignRenderer::new);
+        event.registerBlockEntityRenderer(ModBlockEntities.MOD_HANGING_SIGN.get(), HangingSignRenderer::new);
     }
 }

@@ -17,37 +17,36 @@ public class ModCreativeModeTabs {
     public static final RegistryObject<CreativeModeTab> EBONY_TREES_TAB = CREATIVE_MODE_TABS.register("ebony_trees_tab",
             ()-> CreativeModeTab.builder().icon(()-> new ItemStack(ModItems.EBONY_SAPLING.get()))
                     .title(Component.translatable("creativetab.ebony_trees_tab"))
-                    .displayItems((itemDisplayParameters, output) -> {
-                        output.accept(ModItems.EBONY_SAPLING.get());
+                    .displayItems((itemDisplayParameters, pOutput) -> {
 
-                        output.accept(ModBlocks.EBONY_LOG.get());
-                        output.accept(ModBlocks.EBONY_WOOD.get());
-                        output.accept(ModBlocks.STRIPPED_EBONY_LOG.get());
-                        output.accept(ModBlocks.STRIPPED_EBONY_WOOD.get());
+                        pOutput.accept(ModItems.EBONY_SAPLING.get());
 
-                        output.accept(ModBlocks.EBONY_PLANKS.get());
-                        output.accept(ModBlocks.EBONY_LEAVES.get());
+                        pOutput.accept(ModItems.EBONY_SIGN.get());
+                        pOutput.accept(ModItems.EBONY_HANGING_SIGN.get());
 
-                        output.accept(ModBlocks.EBONY_STAIRS.get());
-                        output.accept(ModBlocks.EBONY_SLAB.get());
-                        output.accept(ModBlocks.EBONY_BUTTON.get());
-                        output.accept(ModBlocks.EBONY_PRESSURE_PLATE.get());
-                        output.accept(ModBlocks.EBONY_FENCE.get());
-                        output.accept(ModBlocks.EBONY_FENCE_GATE.get());
+                        pOutput.accept(ModBlocks.EBONY_STAIRS.get());
+                        pOutput.accept(ModBlocks.EBONY_SLAB.get());
+                        pOutput.accept(ModBlocks.EBONY_BUTTON.get());
+                        pOutput.accept(ModBlocks.EBONY_PRESSURE_PLATE.get());
 
-                        output.accept(ModBlocks.EBONY_DOOR.get());
-                        output.accept(ModBlocks.EBONY_TRAPDOOR.get());
+                        pOutput.accept(ModBlocks.EBONY_FENCE.get());
+                        pOutput.accept(ModBlocks.EBONY_FENCE_GATE.get());
 
-                        output.accept(ModBlocks.EBONY_SIGN.get());
-                        output.accept(ModBlocks.EBONY_HANGING_SIGN.get());
+                        pOutput.accept(ModBlocks.EBONY_DOOR.get());
+                        pOutput.accept(ModBlocks.EBONY_TRAPDOOR.get());
 
+                        pOutput.accept(ModBlocks.EBONY_LOG.get());
+                        pOutput.accept(ModBlocks.EBONY_WOOD.get());
+                        pOutput.accept(ModBlocks.STRIPPED_EBONY_LOG.get());
+                        pOutput.accept(ModBlocks.STRIPPED_EBONY_WOOD.get());
 
+                        pOutput.accept(ModBlocks.EBONY_PLANKS.get());
+                        pOutput.accept(ModBlocks.EBONY_LEAVES.get());
 
                     })
                     .build());
 
     public static void  register(IEventBus eventBus) {
-
         CREATIVE_MODE_TABS.register(eventBus);
     }
 }
