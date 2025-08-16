@@ -24,6 +24,9 @@ public class ModCreativeModeTabs {
                         pOutput.accept(ModItems.EBONY_SIGN.get());
                         pOutput.accept(ModItems.EBONY_HANGING_SIGN.get());
 
+                        pOutput.accept(ModItems.EBONY_BOAT.get());
+                        pOutput.accept(ModItems.EBONY_CHEST_BOAT.get());
+
                         pOutput.accept(ModBlocks.EBONY_STAIRS.get());
                         pOutput.accept(ModBlocks.EBONY_SLAB.get());
                         pOutput.accept(ModBlocks.EBONY_BUTTON.get());

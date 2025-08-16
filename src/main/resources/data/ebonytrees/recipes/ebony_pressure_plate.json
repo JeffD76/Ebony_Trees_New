@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "##"
+  ],
+  "key": {
+    "#": {
+      "item": "ebonytrees:ebony_planks"
+    }
+  },
+  "result": {
+    "item": "ebonytrees:ebony_pressure_plate"
+  }
+}

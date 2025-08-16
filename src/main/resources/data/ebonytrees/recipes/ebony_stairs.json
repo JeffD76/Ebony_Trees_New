@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "#  ",
+    "## ",
+    "###"
+  ],
+  "key": {
+    "#": {
+      "item": "ebonytrees:ebony_planks"
+    }
+  },
+  "result": {
+    "item": "ebonytrees:ebony_stairs",
+    "count": 4
+  }
+}

@@ -1,6 +1,7 @@
 package net.jeffd76.ebonytrees.block.custom;
 
 import net.jeffd76.ebonytrees.block.entity.ModHangingSignBlockEntity;
+import net.jeffd76.ebonytrees.block.entity.ModSignBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.WallBannerBlock;

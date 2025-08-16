@@ -38,6 +38,9 @@ public class ModItemModelProvider extends ItemModelProvider {
         simpleItem(ModItems.EBONY_SIGN);
         simpleItem(ModItems.EBONY_HANGING_SIGN);
 
+        simpleItem(ModItems.EBONY_BOAT);
+        simpleItem(ModItems.EBONY_CHEST_BOAT);
+
     }
 
     public void evenSimplerBlockItem(RegistryObject<Block> block) {

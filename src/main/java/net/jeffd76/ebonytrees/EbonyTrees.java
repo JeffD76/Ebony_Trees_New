@@ -3,13 +3,20 @@ package net.jeffd76.ebonytrees;
 import com.mojang.logging.LogUtils;
 import net.jeffd76.ebonytrees.block.ModBlocks;
 import net.jeffd76.ebonytrees.block.entity.ModBlockEntities;
+import net.jeffd76.ebonytrees.entity.ModEntities;
+import net.jeffd76.ebonytrees.entity.client.ModBoatRenderer;
+import net.jeffd76.ebonytrees.entity.custom.ModBoatEntity;
 import net.jeffd76.ebonytrees.item.ModCreativeModeTabs;
 import net.jeffd76.ebonytrees.item.ModItems;
 import net.jeffd76.ebonytrees.loot.ModLootModifiers;
 import net.jeffd76.ebonytrees.recipe.ModRecipes;
 import net.jeffd76.ebonytrees.util.ModWoodTypes;
+import net.minecraft.client.model.BoatModel;
+import net.minecraft.client.model.ChestBoatModel;
+import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.renderer.Sheets;
-import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.client.renderer.entity.EntityRenderers;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
@@ -18,11 +25,11 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
+import net.minecraftforge.client.event.EntityRenderersEvent;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(EbonyTrees.MOD_ID)
@@ -44,6 +51,8 @@ public class EbonyTrees {
 
         ModBlockEntities.register(modEventBus);
         ModRecipes.register(modEventBus);
+
+        ModEntities.register(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
 
@@ -76,6 +85,9 @@ public class EbonyTrees {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event){
             Sheets.addWoodType(ModWoodTypes.EBONY);
+
+            EntityRenderers.register(ModEntities.MOD_BOAT.get(), pContext -> new ModBoatRenderer(pContext, false));
+            EntityRenderers.register(ModEntities.MOD_CHEST_BOAT.get(), pContext -> new ModBoatRenderer(pContext, true));
 
 
         }

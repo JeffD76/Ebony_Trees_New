@@ -2,6 +2,8 @@ package net.jeffd76.ebonytrees.item;
 
 import net.jeffd76.ebonytrees.EbonyTrees;
 import net.jeffd76.ebonytrees.block.ModBlocks;
+import net.jeffd76.ebonytrees.entity.custom.ModBoatEntity;
+import net.jeffd76.ebonytrees.item.custom.ModBoatItem;
 import net.minecraft.world.item.HangingSignItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.SignItem;
@@ -22,6 +24,10 @@ public class ModItems {
     public static final RegistryObject<Item> EBONY_HANGING_SIGN = ITEMS.register("ebony_hanging_sign",
             ()-> new HangingSignItem(ModBlocks.EBONY_HANGING_SIGN.get(), ModBlocks.EBONY_WALL_HANGING_SIGN.get(), new Item.Properties().stacksTo(16)));
 
+    public static final RegistryObject<Item> EBONY_BOAT = ITEMS.register("ebony_boat",
+            ()-> new ModBoatItem(false, ModBoatEntity.Type.EBONY, new Item.Properties()));
+    public static final RegistryObject<Item> EBONY_CHEST_BOAT = ITEMS.register("ebony_chest_boat",
+            ()-> new ModBoatItem(true, ModBoatEntity.Type.EBONY, new Item.Properties()));
 
     public static void  register(IEventBus eventBus) {
         ITEMS.register(eventBus);

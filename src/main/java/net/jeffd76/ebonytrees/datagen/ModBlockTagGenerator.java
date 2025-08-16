@@ -2,6 +2,7 @@ package net.jeffd76.ebonytrees.datagen;
 
 import net.jeffd76.ebonytrees.EbonyTrees;
 import net.jeffd76.ebonytrees.block.ModBlocks;
+import net.jeffd76.ebonytrees.util.ModTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
 import net.minecraft.tags.BlockTags;
@@ -19,7 +20,14 @@ public class ModBlockTagGenerator extends BlockTagsProvider {
     @Override
     protected void addTags(HolderLookup.Provider pProvider) {
 
-       this.tag(BlockTags.LOGS_THAT_BURN)
+
+        this.tag(ModTags.Blocks.EBONY_LOGS)
+                .add(ModBlocks.EBONY_LOG.get())
+                .add(ModBlocks.EBONY_WOOD.get())
+                .add(ModBlocks.STRIPPED_EBONY_LOG.get())
+                .add(ModBlocks.STRIPPED_EBONY_WOOD.get());
+
+        this.tag(BlockTags.LOGS_THAT_BURN)
                .add(ModBlocks.EBONY_LOG.get())
                .add(ModBlocks.EBONY_WOOD.get())
                .add(ModBlocks.STRIPPED_EBONY_LOG.get())

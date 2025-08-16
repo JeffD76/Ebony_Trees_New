@@ -1,6 +1,9 @@
 {
   "item.ebonytrees.ebony_sapling": "Ebony Sapling",
 
+  "item.ebonytrees.ebony_boat": "Ebony Boat",
+  "item.ebonytrees.ebony_chest_boat": "Ebony Chest Boat",
+
   "creativetab.ebony_trees_tab": "Ebony Trees Tab",
 
   "block.ebonytrees.ebony_log": "Ebony Log",
@@ -19,5 +22,7 @@
   "block.ebonytrees.ebony_door": "Ebony Door",
   "block.ebonytrees.ebony_trapdoor": "Ebony Trapdoor",
   "block.ebonytrees.ebony_sign": "Ebony Sign",
-  "block.ebonytrees.ebony_hanging_sign": "Ebony Hanging Sign"
+  "block.ebonytrees.ebony_hanging_sign": "Ebony Hanging Sign",
+
+  "entity.ebonytrees.mod_chest_boat": "Boat with Chest"
 }
