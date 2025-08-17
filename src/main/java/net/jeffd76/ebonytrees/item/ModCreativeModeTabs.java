@@ -15,11 +15,11 @@ public class ModCreativeModeTabs {
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, EbonyTrees.MOD_ID);
 
     public static final RegistryObject<CreativeModeTab> EBONY_TREES_TAB = CREATIVE_MODE_TABS.register("ebony_trees_tab",
-            ()-> CreativeModeTab.builder().icon(()-> new ItemStack(ModItems.EBONY_SAPLING.get()))
+            ()-> CreativeModeTab.builder().icon(()-> new ItemStack(ModBlocks.EBONY_SAPLING.get()))
                     .title(Component.translatable("creativetab.ebony_trees_tab"))
                     .displayItems((itemDisplayParameters, pOutput) -> {
 
-                        pOutput.accept(ModItems.EBONY_SAPLING.get());
+                        pOutput.accept(ModBlocks.EBONY_SAPLING.get());
 
                         pOutput.accept(ModItems.EBONY_SIGN.get());
                         pOutput.accept(ModItems.EBONY_HANGING_SIGN.get());

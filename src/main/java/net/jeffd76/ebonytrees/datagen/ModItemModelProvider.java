@@ -10,7 +10,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraftforge.client.model.generators.ItemModelBuilder;
 import net.minecraftforge.client.model.generators.ItemModelProvider;
 import net.minecraftforge.common.data.ExistingFileHelper;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
@@ -21,7 +20,6 @@ public class ModItemModelProvider extends ItemModelProvider {
 
     @Override
     protected void registerModels() {
-        simpleItem(ModItems.EBONY_SAPLING);
 
         simpleBlockItem(ModBlocks.EBONY_DOOR);
 
@@ -41,6 +39,14 @@ public class ModItemModelProvider extends ItemModelProvider {
         simpleItem(ModItems.EBONY_BOAT);
         simpleItem(ModItems.EBONY_CHEST_BOAT);
 
+        saplingItem(ModBlocks.EBONY_SAPLING);
+
+    }
+
+    private ItemModelBuilder saplingItem(RegistryObject<Block> item) {
+        return withExistingParent(item.getId().getPath(),
+                new ResourceLocation("item/generated")).texture("layer0",
+                new ResourceLocation(EbonyTrees.MOD_ID,"block/" + item.getId().getPath()));
     }
 
     public void evenSimplerBlockItem(RegistryObject<Block> block) {

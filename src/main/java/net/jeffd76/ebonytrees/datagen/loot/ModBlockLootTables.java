@@ -5,7 +5,6 @@ import net.jeffd76.ebonytrees.item.ModItems;
 import net.minecraft.data.loot.BlockLootSubProvider;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.registries.RegistryObject;
 import org.jetbrains.annotations.NotNull;
 
@@ -24,6 +23,7 @@ public class ModBlockLootTables extends BlockLootSubProvider {
         this.dropSelf(ModBlocks.STRIPPED_EBONY_WOOD.get());
         this.dropSelf(ModBlocks.STRIPPED_EBONY_LOG.get());
         this.dropSelf(ModBlocks.EBONY_PLANKS.get());
+        this.dropSelf(ModBlocks.EBONY_SAPLING.get());
 
         this.dropSelf(ModBlocks.EBONY_STAIRS.get());
         this.dropSelf(ModBlocks.EBONY_BUTTON.get());
@@ -39,7 +39,7 @@ public class ModBlockLootTables extends BlockLootSubProvider {
                 block -> createDoorTable(ModBlocks.EBONY_DOOR.get()));
 
         this.add(ModBlocks.EBONY_LEAVES.get(), block ->
-                createLeavesDrops(block, Blocks.OAK_SAPLING, NORMAL_LEAVES_SAPLING_CHANCES)); //TODO: change to sapling
+                createLeavesDrops(block, ModBlocks.EBONY_SAPLING.get(), NORMAL_LEAVES_SAPLING_CHANCES));
 
         this.add(ModBlocks.EBONY_SIGN.get(), block ->
                 createSingleItemTable(ModItems.EBONY_SIGN.get()));

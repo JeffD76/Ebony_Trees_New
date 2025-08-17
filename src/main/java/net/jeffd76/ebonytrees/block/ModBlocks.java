@@ -4,6 +4,7 @@ import net.jeffd76.ebonytrees.EbonyTrees;
 import net.jeffd76.ebonytrees.block.custom.*;
 import net.jeffd76.ebonytrees.item.ModItems;
 import net.jeffd76.ebonytrees.util.ModWoodTypes;
+import net.jeffd76.ebonytrees.worldgen.tree.EbonyTreeGrower;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundEvents;
@@ -79,7 +80,10 @@ public class ModBlocks {
             });
 
     public static final RegistryObject<Block> EBONY_LEAVES = registerBlock("ebony_leaves",
-            () -> new LeavesBlock(BlockBehaviour.Properties.copy(Blocks.OAK_LEAVES)){
+            () -> new LeavesBlock(BlockBehaviour.Properties.copy(Blocks.OAK_LEAVES)
+                    .strength(0.2f)
+                    .randomTicks()
+                    .sound(SoundType.GRASS)){
                 @Override
                 public boolean isFlammable(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
                     return true;
@@ -106,7 +110,8 @@ public class ModBlocks {
     public static final RegistryObject<Block> EBONY_WALL_HANGING_SIGN = BLOCKS.register("ebony_wall_hanging_sign",
             ()-> new ModWallHangingSignBlock(BlockBehaviour.Properties.copy(Blocks.OAK_WALL_HANGING_SIGN), ModWoodTypes.EBONY));
 
-
+    public static final RegistryObject<Block> EBONY_SAPLING = registerBlock("ebony_sapling",
+            () -> new SaplingBlock(new EbonyTreeGrower(), BlockBehaviour.Properties.copy(Blocks.OAK_SAPLING)));
 
     private static <T extends Block> RegistryObject<T> registerBlock(String name, Supplier<T> block) {
         RegistryObject<T> toReturn = BLOCKS.register(name, block);

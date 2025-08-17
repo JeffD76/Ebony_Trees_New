@@ -16,9 +16,6 @@ public class ModItems {
     public static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(ForgeRegistries.ITEMS, EbonyTrees.MOD_ID);
 
-    public static final RegistryObject<Item> EBONY_SAPLING = ITEMS.register("ebony_sapling",
-            ()-> new Item(new Item.Properties()));
-
     public static final RegistryObject<Item> EBONY_SIGN = ITEMS.register("ebony_sign",
             ()-> new SignItem(new Item.Properties().stacksTo(16), ModBlocks.EBONY_SIGN.get(), ModBlocks.EBONY_WALL_SIGN.get()));
     public static final RegistryObject<Item> EBONY_HANGING_SIGN = ITEMS.register("ebony_hanging_sign",

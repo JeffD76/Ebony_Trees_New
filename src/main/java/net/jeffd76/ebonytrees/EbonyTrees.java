@@ -5,18 +5,15 @@ import net.jeffd76.ebonytrees.block.ModBlocks;
 import net.jeffd76.ebonytrees.block.entity.ModBlockEntities;
 import net.jeffd76.ebonytrees.entity.ModEntities;
 import net.jeffd76.ebonytrees.entity.client.ModBoatRenderer;
-import net.jeffd76.ebonytrees.entity.custom.ModBoatEntity;
 import net.jeffd76.ebonytrees.item.ModCreativeModeTabs;
 import net.jeffd76.ebonytrees.item.ModItems;
 import net.jeffd76.ebonytrees.loot.ModLootModifiers;
 import net.jeffd76.ebonytrees.recipe.ModRecipes;
 import net.jeffd76.ebonytrees.util.ModWoodTypes;
-import net.minecraft.client.model.BoatModel;
-import net.minecraft.client.model.ChestBoatModel;
-import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.jeffd76.ebonytrees.worldgen.tree.ModFoliagePlacers;
+import net.jeffd76.ebonytrees.worldgen.tree.ModTrunkPlacerTypes;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.entity.EntityRenderers;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
@@ -29,7 +26,6 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
-import net.minecraftforge.client.event.EntityRenderersEvent;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(EbonyTrees.MOD_ID)
@@ -50,9 +46,13 @@ public class EbonyTrees {
         ModLootModifiers.register(modEventBus);
 
         ModBlockEntities.register(modEventBus);
+
         ModRecipes.register(modEventBus);
 
         ModEntities.register(modEventBus);
+        ModTrunkPlacerTypes.register(modEventBus);
+
+        ModFoliagePlacers.register(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
 

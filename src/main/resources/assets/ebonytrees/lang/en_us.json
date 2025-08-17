@@ -24,5 +24,6 @@
   "block.ebonytrees.ebony_sign": "Ebony Sign",
   "block.ebonytrees.ebony_hanging_sign": "Ebony Hanging Sign",
 
-  "entity.ebonytrees.mod_chest_boat": "Boat with Chest"
+  "entity.ebonytrees.mod_chest_boat": "Boat with Chest",
+  "block:ebonytrees.ebony_sapling": "Ebony Sapling"
 }

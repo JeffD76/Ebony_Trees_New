@@ -3,7 +3,6 @@ package net.jeffd76.ebonytrees.datagen;
 import net.jeffd76.ebonytrees.datagen.loot.ModBlockLootTables;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.loot.LootTableProvider;
-import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 
 import java.util.List;
