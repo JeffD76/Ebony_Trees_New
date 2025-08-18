@@ -6,6 +6,7 @@ import net.jeffd76.ebonytrees.worldgen.tree.ModFoliagePlacers;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.IntProvider;
 import net.minecraft.world.level.LevelSimulatedReader;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.levelgen.feature.configurations.TreeConfiguration;
 import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
 import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacerType;
@@ -16,12 +17,11 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
                     .forGetter(fp -> fp.height)).apply(ebonyFoliagePlacerInstance, EbonyFoliagePlacer::new));
 
     // Realistic ebony tree foliage variables
-    private static final int MIN_FOLIAGE_HEIGHT = 6;  // Minimum canopy height
-    private static final int MAX_FOLIAGE_HEIGHT = 12; // Maximum canopy height
-    private static final int MIN_RADIUS = 5;          // Minimum canopy radius
-    private static final int MAX_RADIUS = 8;         // Maximum canopy radius (matches real 15-20 block diameter)
-    private static final float DENSITY_FACTOR = 0.9f; // Very dense foliage (90% density)
-    private static final float ROUNDNESS_FACTOR = 0.8f; // How rounded the canopy should be
+    private static final int MIN_FOLIAGE_HEIGHT = 6;
+    private static final int MAX_FOLIAGE_HEIGHT = 12;
+    private static final int MIN_RADIUS = 5;
+    private static final int MAX_RADIUS = 8;
+    private static final float DENSITY_FACTOR = 0.9f;
 
     private final int height;
 
@@ -43,185 +43,102 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
         int actualFoliageHeight = Math.max(MIN_FOLIAGE_HEIGHT, Math.min(MAX_FOLIAGE_HEIGHT, pFoliageHeight + pRandom.nextInt(3)));
         int baseRadius = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, pFoliageRadius + pRandom.nextInt(2)));
 
+        // Track branch positions for exposed log coverage
+        java.util.Set<net.minecraft.core.BlockPos> branchPositions = new java.util.HashSet<>();
+
         // Create dense, rounded canopy characteristic of ebony trees
         for (int layer = 0; layer < actualFoliageHeight; layer++) {
             int currentRadius = calculateLayerRadius(layer, actualFoliageHeight, baseRadius, pRandom);
+            net.minecraft.core.BlockPos layerPos = pAttachment.pos().above(layer - pOffset);
 
-            // Add supporting branches for this layer to prevent leaf decay
-            // But avoid the very top layers to prevent exposed logs
-            if ((layer % 2 == 0 || currentRadius >= 4) && layer < actualFoliageHeight - 2) { // Don't add branches in top 2 layers
-                createSupportingBranches(pLevel, pBlockSetter, pRandom, pConfig,
-                        pAttachment.pos().above(layer - pOffset),
-                        currentRadius, layer, actualFoliageHeight);
-            }
+            // Consolidated branch creation based on layer conditions
+            createLayerBranches(pLevel, pBlockSetter, pRandom, pConfig, layerPos,
+                    currentRadius, layer, actualFoliageHeight, branchPositions);
 
-            // Add additional edge support branches for larger canopies to prevent edge decay
-            if (currentRadius >= 6 && layer % 3 == 0 && layer < actualFoliageHeight - 1) {
-                createEdgeSupportBranches(pLevel, pBlockSetter, pRandom, pConfig,
-                        pAttachment.pos().above(layer - pOffset),
-                        currentRadius, layer, actualFoliageHeight);
-            }
-
-            // Add extra dense branching for bottom half where canopy is largest
-            if (layer < actualFoliageHeight / 2 && currentRadius >= 7) {
-                createDenseBottomBranches(pLevel, pBlockSetter, pRandom, pConfig,
-                        pAttachment.pos().above(layer - pOffset),
-                        currentRadius, layer, actualFoliageHeight);
-            }
-
-            // Create the foliage layer with realistic density and shape
+            // Create the foliage layer
             createDenseRoundedLayer(pLevel, pBlockSetter, pRandom, pConfig,
-                    pAttachment.pos().above(layer - pOffset),
-                    currentRadius, layer, actualFoliageHeight, pAttachment.doubleTrunk());
+                    layerPos, currentRadius);
         }
 
-        // Add some sparse leaves below the main canopy for realism
+        // Connect lower canopy branches to main trunk with diagonal supports
+        connectBranchesToTrunk(pLevel, pBlockSetter, pRandom, pConfig, branchPositions,
+                pAttachment.pos(), pOffset);
+
+        // Cover any exposed branches in upper 3/4 of canopy
+        coverExposedBranches(pLevel, pBlockSetter, pRandom, pConfig, branchPositions
+        );
+
+        // Add sparse undercanopy
         if (pRandom.nextFloat() < 0.6f) {
             createSparseUndercanopy(pLevel, pBlockSetter, pRandom, pConfig,
-                    pAttachment.pos().below(1), baseRadius - 3, pAttachment.doubleTrunk());
+                    pAttachment.pos().below(1), baseRadius - 3);
         }
     }
 
     /**
-     * Creates very dense branching for the bottom half of the canopy where it's largest
+     * Unified branch creation method that handles all branch types based on layer conditions
      */
-    private void createDenseBottomBranches(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
-                                           TreeConfiguration pConfig, net.minecraft.core.BlockPos layerCenter,
-                                           int radius, int layer, int totalHeight) {
+    private void createLayerBranches(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
+                                     TreeConfiguration pConfig, net.minecraft.core.BlockPos layerCenter,
+                                     int radius, int layer, int totalHeight, java.util.Set<net.minecraft.core.BlockPos> branchPositions) {
 
-        // Create a grid-like pattern of branches to ensure complete coverage
-        int branchCount = Math.max(12, radius * 2); // Very dense branching for bottom layers
+        // Skip branches in top layers to prevent exposure
+        if (layer >= totalHeight - 2) return;
+
+        // Only create branches every 4th layer
+        if (layer % 4 != 0) return;
+
+        boolean isBottomHalf = layer < totalHeight / 2;
+
+        // Reduced branch count for cleaner look while maintaining coverage
+        int branchCount = Math.max(4, radius / 2); // Back to more conservative count
+
+        // Only add extra branches for very large bottom canopies
+        if (isBottomHalf && radius >= 8) {
+            branchCount = Math.max(6, radius * 2 / 3); // Reduced from radius * 3
+        }
+
+        // Create branches for this layer - single pass only
+        createBranches(pLevel, pBlockSetter, pRandom, pConfig, layerCenter,
+                radius, layer, totalHeight, branchCount, false, branchPositions);
+    }
+
+    /**
+     * Optimized branch creation with pre-calculated values
+     */
+    private void createBranches(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
+                                TreeConfiguration pConfig, net.minecraft.core.BlockPos layerCenter,
+                                int radius, int layer, int totalHeight, int branchCount, boolean isDenseMode,
+                                java.util.Set<net.minecraft.core.BlockPos> branchPositions) {
+
+        // Pre-calculate all values to avoid repeated calculations
+        boolean isUpperCanopy = layer >= totalHeight * 0.25f;
+        int maxBranchLength = layer > totalHeight * 0.7f ? radius - 1 : Math.min(radius + 1, 6);
+        int targetDistance = Math.min(maxBranchLength, radius - 1);
+        double angleStep = (2 * Math.PI) / branchCount;
 
         for (int i = 0; i < branchCount; i++) {
-            double angle = (2 * Math.PI * i) / branchCount + pRandom.nextDouble() * 0.2 - 0.1;
+            double angle = angleStep * i + pRandom.nextDouble() * 0.2 - 0.1;
+            double cosAngle = Math.cos(angle);
+            double sinAngle = Math.sin(angle);
 
-            // Create branches at multiple distances to ensure no gaps
-            for (int distance = 2; distance <= Math.min(4, radius); distance++) {
-                int branchX = (int) Math.round(Math.cos(angle) * distance);
-                int branchZ = (int) Math.round(Math.sin(angle) * distance);
+            // Create branch segments efficiently
+            for (int j = 2; j <= targetDistance; j++) {
+                int branchX = (int) Math.round(cosAngle * j);
+                int branchZ = (int) Math.round(sinAngle * j);
 
-                net.minecraft.core.BlockPos branchPos = layerCenter.offset(branchX, 0, branchZ);
-
-                // Check if this position needs support (is within the canopy area)
-                double distanceFromCenter = Math.sqrt(branchX * branchX + branchZ * branchZ);
-
-                if (distanceFromCenter <= radius * 0.9 && this.isReplaceable(pLevel, branchPos)) {
-                    // High chance to place branches in bottom half
-                    if (pRandom.nextFloat() < 0.8f) {
-                        net.minecraft.world.level.block.state.BlockState branchState = pConfig.trunkProvider.getState(pRandom, branchPos);
-
-                        // Set proper axis
-                        if (branchState.hasProperty(net.minecraft.world.level.block.RotatedPillarBlock.AXIS)) {
-                            if (Math.abs(branchX) > Math.abs(branchZ)) {
-                                branchState = branchState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,
-                                        net.minecraft.core.Direction.Axis.X);
-                            } else {
-                                branchState = branchState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,
-                                        net.minecraft.core.Direction.Axis.Z);
-                            }
-                        }
-
-                        pBlockSetter.set(branchPos, branchState);
-                    }
-                }
-            }
-        }
-
-        // Add some intermediate branches to fill any remaining gaps
-        createIntermediateBranches(pLevel, pBlockSetter, pRandom, pConfig, layerCenter, radius);
-    }
-
-    /**
-     * Creates intermediate branches to fill gaps between main branches
-     */
-    private void createIntermediateBranches(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
-                                            TreeConfiguration pConfig, net.minecraft.core.BlockPos layerCenter, int radius) {
-
-        // Add branches in between the main radial branches
-        for (int x = -radius; x <= radius; x++) {
-            for (int z = -radius; z <= radius; z++) {
-                if (x == 0 && z == 0) continue; // Skip center
-
-                double distance = Math.sqrt(x * x + z * z);
-
-                // Place branches at strategic intervals to prevent gaps
-                if (distance > 2 && distance <= Math.min(4, radius * 0.8) &&
-                        (Math.abs(x) % 2 == 0 || Math.abs(z) % 2 == 0) &&
-                        pRandom.nextFloat() < 0.4f) {
-
-                    net.minecraft.core.BlockPos branchPos = layerCenter.offset(x, 0, z);
-
-                    if (this.isReplaceable(pLevel, branchPos)) {
-                        net.minecraft.world.level.block.state.BlockState branchState = pConfig.trunkProvider.getState(pRandom, branchPos);
-
-                        // Set proper axis
-                        if (branchState.hasProperty(net.minecraft.world.level.block.RotatedPillarBlock.AXIS)) {
-                            if (Math.abs(x) > Math.abs(z)) {
-                                branchState = branchState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,
-                                        net.minecraft.core.Direction.Axis.X);
-                            } else {
-                                branchState = branchState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,
-                                        net.minecraft.core.Direction.Axis.Z);
-                            }
-                        }
-
-                        pBlockSetter.set(branchPos, branchState);
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Creates additional branches specifically at canopy edges to prevent edge leaf decay
-     */
-    private void createEdgeSupportBranches(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
-                                           TreeConfiguration pConfig, net.minecraft.core.BlockPos layerCenter,
-                                           int radius, int layer, int totalHeight) {
-
-        // More branches specifically targeting the outer edge
-        int edgeBranchCount = Math.max(5, radius); // At least 6 branches, more for larger canopies
-
-        for (int i = 0; i < edgeBranchCount; i++) {
-            // Distribute branches evenly around the circle
-            double angle = (2 * Math.PI * i) / edgeBranchCount;
-
-            // Target the edge area (75-95% of radius)
-            int targetDistance = Math.max(3, (int) (radius * (0.75f + pRandom.nextFloat() * 0.2f)));
-
-            // Calculate branch end position
-            int branchEndX = (int) Math.round(Math.cos(angle) * targetDistance);
-            int branchEndZ = (int) Math.round(Math.sin(angle) * targetDistance);
-
-            // Create branch from center outward
-            int actualBranchLength = Math.min(4, targetDistance); // Stay within decay range
-
-            for (int j = Math.max(1, targetDistance - 3); j <= targetDistance && j <= 4; j++) {
-                int branchX = (int) Math.round(Math.cos(angle) * j);
-                int branchZ = (int) Math.round(Math.sin(angle) * j);
+                // Quick bounds check before creating BlockPos
+                double distanceSquared = branchX * branchX + branchZ * branchZ;
+                if (distanceSquared > radius * radius * 0.81) continue; // radius * 0.9 squared
 
                 net.minecraft.core.BlockPos branchPos = layerCenter.offset(branchX, 0, branchZ);
 
-                // Only place if it won't be exposed
-                if (this.isReplaceable(pLevel, branchPos)) {
-                    double distanceFromCenter = Math.sqrt(branchX * branchX + branchZ * branchZ);
+                if (pLevel.isStateAtPosition(branchPos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
+                    placeBranchBlockOptimized(pBlockSetter, pRandom, pConfig, branchPos, branchX, branchZ);
 
-                    // Only place branches that are well within the expected leaf coverage
-                    if (distanceFromCenter <= radius * 0.85) {
-                        net.minecraft.world.level.block.state.BlockState branchState = pConfig.trunkProvider.getState(pRandom, branchPos);
-
-                        // Set proper axis
-                        if (branchState.hasProperty(net.minecraft.world.level.block.RotatedPillarBlock.AXIS)) {
-                            if (Math.abs(branchX) > Math.abs(branchZ)) {
-                                branchState = branchState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,
-                                        net.minecraft.core.Direction.Axis.X);
-                            } else {
-                                branchState = branchState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,
-                                        net.minecraft.core.Direction.Axis.Z);
-                            }
-                        }
-
-                        pBlockSetter.set(branchPos, branchState);
+                    // Only track upper canopy branches
+                    if (isUpperCanopy) {
+                        branchPositions.add(branchPos);
                     }
                 }
             }
@@ -229,160 +146,292 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
     }
 
     /**
-     * Helper method to check if a position can be replaced
+     * Optimized branch block placement with minimal object creation
      */
-    private boolean isReplaceable(LevelSimulatedReader pLevel, net.minecraft.core.BlockPos pPos) {
-        return pLevel.isStateAtPosition(pPos, state -> state.canBeReplaced());
+    private void placeBranchBlockOptimized(FoliageSetter pBlockSetter, RandomSource pRandom, TreeConfiguration pConfig,
+                                           net.minecraft.core.BlockPos branchPos, int branchX, int branchZ) {
+
+        net.minecraft.world.level.block.state.BlockState branchState = pConfig.trunkProvider.getState(pRandom, branchPos);
+
+        // Inline axis calculation - avoid method calls
+        if (branchState.hasProperty(net.minecraft.world.level.block.RotatedPillarBlock.AXIS)) {
+            net.minecraft.core.Direction.Axis axis = Math.abs(branchX) > Math.abs(branchZ) ?
+                    net.minecraft.core.Direction.Axis.X : net.minecraft.core.Direction.Axis.Z;
+            branchState = branchState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, axis);
+        }
+
+        pBlockSetter.set(branchPos, branchState);
     }
 
     /**
-     * Creates supporting branches to prevent leaf decay
+     * Streamlined lowest level connection with minimal calculations
      */
-    private void createSupportingBranches(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
-                                          TreeConfiguration pConfig, net.minecraft.core.BlockPos layerCenter,
-                                          int radius, int layer, int totalHeight) {
+    private void connectBranchesToTrunk(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
+                                        TreeConfiguration pConfig, java.util.Set<net.minecraft.core.BlockPos> branchPositions,
+                                        net.minecraft.core.BlockPos trunkBase, int offset) {
 
-        // Reduce branch length for higher layers to prevent exposure
-        float heightProgress = (float) layer / (float) totalHeight;
-        int maxBranchLength = heightProgress > 0.7f ? Math.max(2, radius / 2) : Math.min(4, radius - 1);
+        if (branchPositions.isEmpty()) return;
 
-        // Number of branches depends on radius and layer
-        int branchCount = Math.min(8, Math.max(4, radius / 2 + pRandom.nextInt(2))); // Increased branch count
+        // Find lowest branch height efficiently
+        int lowestHeight = Integer.MAX_VALUE;
+        int trunkBaseY = trunkBase.getY();
 
-        for (int i = 0; i < branchCount; i++) {
-            // Distribute branches evenly around the circle
-            double angle = (2 * Math.PI * i) / branchCount + pRandom.nextDouble() * 0.3 - 0.15;
+        for (net.minecraft.core.BlockPos branchPos : branchPositions) {
+            int height = branchPos.getY() - trunkBaseY + offset;
+            if (height < lowestHeight) lowestHeight = height;
+        }
 
-            // Branch length varies with radius but stays within leaf decay range
-            int branchLength = Math.min(maxBranchLength, Math.max(1, radius / 2 + pRandom.nextInt(2)));
+        // Process only lowest level branches
+        int maxHeight = lowestHeight + 1;
+        net.minecraft.core.BlockPos trunkAtLevel = trunkBase.above(lowestHeight);
 
-            for (int j = 1; j <= branchLength; j++) {
-                // Calculate branch position
-                int branchX = (int) Math.round(Math.cos(angle) * j);
-                int branchZ = (int) Math.round(Math.sin(angle) * j);
+        for (net.minecraft.core.BlockPos branchPos : branchPositions) {
+            int branchHeight = branchPos.getY() - trunkBaseY + offset;
 
-                net.minecraft.core.BlockPos branchPos = layerCenter.offset(branchX, 0, branchZ);
+            if (branchHeight <= maxHeight) {
+                // Quick distance check
+                int dx = branchPos.getX() - trunkBase.getX();
+                int dz = branchPos.getZ() - trunkBase.getZ();
 
-                // Only place branch if it will be covered by leaves
-                if (this.isReplaceable(pLevel, branchPos) && willBeCoveredByLeaves(branchPos, layerCenter, radius, layer, totalHeight, pRandom)) {
-                    // Use trunk provider to get consistent wood type
-                    net.minecraft.world.level.block.state.BlockState branchState = pConfig.trunkProvider.getState(pRandom, branchPos);
-
-                    // Set proper axis for horizontal branches
-                    if (branchState.hasProperty(net.minecraft.world.level.block.RotatedPillarBlock.AXIS)) {
-                        // Determine the primary axis of the branch
-                        if (Math.abs(branchX) > Math.abs(branchZ)) {
-                            branchState = branchState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,
-                                    net.minecraft.core.Direction.Axis.X);
-                        } else {
-                            branchState = branchState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,
-                                    net.minecraft.core.Direction.Axis.Z);
-                        }
-                    }
-
-                    pBlockSetter.set(branchPos, branchState);
+                if (dx * dx + dz * dz >= 1) { // Distance >= 1.0 (squared)
+                    createLowestLevelConnectionOptimized(pLevel, pBlockSetter, pRandom, pConfig,
+                            branchPos, trunkAtLevel);
                 }
             }
         }
     }
 
     /**
-     * Checks if a branch position will be covered by leaves to prevent exposed logs
+     * Optimized exposed branch coverage with minimal set operations
      */
-    private boolean willBeCoveredByLeaves(net.minecraft.core.BlockPos branchPos, net.minecraft.core.BlockPos layerCenter,
-                                          int radius, int layer, int totalHeight, RandomSource pRandom) {
+    private void coverExposedBranches(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
+                                      TreeConfiguration pConfig, java.util.Set<net.minecraft.core.BlockPos> branchPositions) {
 
-        double distance = Math.sqrt(Math.pow(branchPos.getX() - layerCenter.getX(), 2) +
-                Math.pow(branchPos.getZ() - layerCenter.getZ(), 2));
+        // Early exit if no branches to process
+        if (branchPositions.isEmpty()) return;
 
-        // If branch is well within the radius, it should be covered
-        if (distance < radius * 0.8) {
-            return true;
+        // Pre-calculate offsets for 6 directions to avoid repeated object creation
+        int[] dx = {0, 0, 0, 0, 1, -1};
+        int[] dy = {1, -1, 0, 0, 0, 0};
+        int[] dz = {0, 0, 1, -1, 0, 0};
+
+        for (net.minecraft.core.BlockPos branchPos : branchPositions) {
+            // Check all 6 directions efficiently
+            for (int i = 0; i < 6; i++) {
+                net.minecraft.core.BlockPos adjacentPos = branchPos.offset(dx[i], dy[i], dz[i]);
+
+                if (pLevel.isStateAtPosition(adjacentPos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
+                    tryPlaceLeaf(pLevel, pBlockSetter, pRandom, pConfig, adjacentPos);
+                }
+            }
         }
+    }
 
-        // For branches near the edge, check if we're in upper layers where radius shrinks
-        float heightProgress = (float) layer / (float) totalHeight;
-        if (heightProgress > 0.6f) {
-            // In upper layers, be more conservative
-            return distance < radius * 0.6;
+    /**
+     * Optimized diagonal connection with pre-calculated state
+     */
+    private void createLowestLevelConnectionOptimized(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
+                                                      TreeConfiguration pConfig, net.minecraft.core.BlockPos branchPos,
+                                                      net.minecraft.core.BlockPos trunkPos) {
+
+        // Pre-calculate direction and distance
+        int dx = branchPos.getX() - trunkPos.getX();
+        int dz = branchPos.getZ() - trunkPos.getZ();
+        int stepX = Integer.compare(dx, 0);
+        int stepZ = Integer.compare(dz, 0);
+        int maxSteps = Math.max(Math.abs(dx), Math.abs(dz)) - 1;
+
+        // Pre-determine axis for efficiency
+        boolean useXAxis = Math.abs(dx) >= Math.abs(dz);
+        net.minecraft.core.Direction.Axis axis = useXAxis ?
+                net.minecraft.core.Direction.Axis.X : net.minecraft.core.Direction.Axis.Z;
+
+        // Create diagonal connection
+        for (int step = 1; step <= maxSteps; step++) {
+            net.minecraft.core.BlockPos connectionPos = trunkPos.offset(stepX * step, 0, stepZ * step);
+
+            if (pLevel.isStateAtPosition(connectionPos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
+                net.minecraft.world.level.block.state.BlockState logState = pConfig.trunkProvider.getState(pRandom, connectionPos);
+
+                if (logState.hasProperty(net.minecraft.world.level.block.RotatedPillarBlock.AXIS)) {
+                    logState = logState.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, axis);
+                }
+
+                pBlockSetter.set(connectionPos, logState);
+            }
         }
-
-        return distance < radius * 0.9;
     }
 
     /**
      * Calculates the radius for each layer to create a rounded canopy shape
      */
     private int calculateLayerRadius(int layer, int totalHeight, int baseRadius, RandomSource pRandom) {
-        // Create a rounded/elliptical shape - wider in middle, narrower at top/bottom
         float heightProgress = (float) layer / (float) totalHeight;
 
-        // Use a curve that creates a rounded top (like real ebony trees)
         float radiusMultiplier;
         if (heightProgress < 0.3f) {
-            // Bottom section - starts smaller
             radiusMultiplier = 0.4f + (heightProgress / 0.3f) * 0.5f;
         } else if (heightProgress < 0.7f) {
-            // Middle section - fullest part
             radiusMultiplier = 0.9f + (pRandom.nextFloat() * 0.2f);
         } else {
-            // Top section - tapers to point
             float topProgress = (heightProgress - 0.7f) / 0.3f;
-            radiusMultiplier = 0.9f * (1.0f - topProgress * topProgress); // Squared for rounded top
+            radiusMultiplier = 0.9f * (1.0f - topProgress * topProgress);
         }
 
         int calculatedRadius = Math.round(baseRadius * radiusMultiplier);
-        return Math.max(1, calculatedRadius + pRandom.nextInt(-1, 2)); // Add small variation
+        return Math.max(1, calculatedRadius + pRandom.nextInt(-1, 2));
     }
 
     /**
-     * Creates a dense, rounded layer of foliage
+     * Creates a dense, rounded layer of foliage with connected leaf placement
      */
     private void createDenseRoundedLayer(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
-                                         TreeConfiguration pConfig, net.minecraft.core.BlockPos layerCenter, int radius,
-                                         int layer, int totalHeight, boolean doubleTrunk) {
+                                         TreeConfiguration pConfig, net.minecraft.core.BlockPos layerCenter, int radius) {
 
-        // Create circular/rounded foliage pattern
+        // First pass: determine which positions should have leaves
+        boolean[][] shouldPlaceLeaf = new boolean[radius * 2 + 1][radius * 2 + 1];
+
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
-                // Calculate distance from center
                 double distance = Math.sqrt(x * x + z * z);
-
-                // Create rounded edges instead of perfect circles
                 double adjustedDistance = distance + (pRandom.nextFloat() - 0.5f) * 0.8;
 
                 if (adjustedDistance <= radius) {
-                    // Higher chance to place leaves closer to center (dense canopy)
                     float centerDistance = (float) (adjustedDistance / radius);
                     float placementChance = DENSITY_FACTOR * (1.0f - centerDistance * 0.3f);
 
-                    // Ensure very dense core
                     if (centerDistance < 0.5f) {
                         placementChance = Math.max(placementChance, 0.95f);
                     }
 
                     if (pRandom.nextFloat() < placementChance) {
-                        net.minecraft.core.BlockPos leafPos = layerCenter.offset(x, 0, z);
-                        this.tryPlaceLeaf(pLevel, pBlockSetter, pRandom, pConfig, leafPos);
+                        shouldPlaceLeaf[x + radius][z + radius] = true;
                     }
+                }
+            }
+        }
+
+        // Second pass: ensure connectivity by filling gaps between isolated leaf clusters
+        ensureLeafConnectivity(shouldPlaceLeaf, radius);
+
+        // Third pass: actually place the leaves
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                if (shouldPlaceLeaf[x + radius][z + radius]) {
+                    net.minecraft.core.BlockPos leafPos = layerCenter.offset(x, 0, z);
+                    tryPlaceLeaf(pLevel, pBlockSetter, pRandom, pConfig, leafPos);
                 }
             }
         }
     }
 
     /**
-     * Creates sparse foliage below the main canopy (like hanging branches)
+     * Ensures leaf connectivity by filling gaps between leaf clusters
+     */
+    private void ensureLeafConnectivity(boolean[][] shouldPlaceLeaf, int radius) {
+        int size = radius * 2 + 1;
+        boolean[][] connected = new boolean[size][size];
+
+        // Mark center area as connected (trunk area)
+        int centerIdx = radius;
+        for (int x = Math.max(0, centerIdx - 1); x <= Math.min(size - 1, centerIdx + 1); x++) {
+            for (int z = Math.max(0, centerIdx - 1); z <= Math.min(size - 1, centerIdx + 1); z++) {
+                connected[x][z] = true;
+            }
+        }
+
+        // Iteratively expand connected areas and fill gaps
+        boolean changed = true;
+        int iterations = 0;
+        while (changed && iterations < 10) { // Prevent infinite loops
+            changed = false;
+            iterations++;
+
+            for (int x = 0; x < size; x++) {
+                for (int z = 0; z < size; z++) {
+                    if (shouldPlaceLeaf[x][z] && !connected[x][z]) {
+                        // Check if this leaf is adjacent to a connected area
+                        if (hasConnectedNeighbor(connected, x, z, size)) {
+                            connected[x][z] = true;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fill small gaps between connected leaf areas to prevent isolation
+        for (int x = 1; x < size - 1; x++) {
+            for (int z = 1; z < size - 1; z++) {
+                if (!shouldPlaceLeaf[x][z]) {
+                    // Check if placing a leaf here would connect isolated areas
+                    int connectedNeighbors = 0;
+                    if (x > 0 && connected[x-1][z]) connectedNeighbors++;
+                    if (x < size-1 && connected[x+1][z]) connectedNeighbors++;
+                    if (z > 0 && connected[x][z-1]) connectedNeighbors++;
+                    if (z < size-1 && connected[x][z+1]) connectedNeighbors++;
+
+                    // If this position would connect multiple areas or fill a small gap
+                    if (connectedNeighbors >= 2) {
+                        double distanceFromCenter = Math.sqrt(Math.pow(x - centerIdx, 2) + Math.pow(z - centerIdx, 2));
+                        if (distanceFromCenter <= radius) { // Only within canopy bounds
+                            shouldPlaceLeaf[x][z] = true;
+                            connected[x][z] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Remove leaves that are still not connected to prevent isolated decay
+        for (int x = 0; x < size; x++) {
+            for (int z = 0; z < size; z++) {
+                if (shouldPlaceLeaf[x][z] && !connected[x][z]) {
+                    shouldPlaceLeaf[x][z] = false;
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks if a position has a connected neighbor
+     */
+    private boolean hasConnectedNeighbor(boolean[][] connected, int x, int z, int size) {
+        // Check 4-directional neighbors (cardinal directions)
+        if (x > 0 && connected[x-1][z]) return true;
+        if (x < size-1 && connected[x+1][z]) return true;
+        if (z > 0 && connected[x][z-1]) return true;
+        return z < size - 1 && connected[x][z + 1];
+    }
+
+    /**
+     * Creates sparse foliage below the main canopy with connectivity checking
      */
     private void createSparseUndercanopy(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
-                                         TreeConfiguration pConfig, net.minecraft.core.BlockPos centerPos, int radius, boolean doubleTrunk) {
+                                         TreeConfiguration pConfig, net.minecraft.core.BlockPos centerPos, int radius) {
+
+        // First pass: determine potential leaf positions
+        boolean[][] shouldPlaceLeaf = new boolean[radius * 2 + 1][radius * 2 + 1];
 
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
                 double distance = Math.sqrt(x * x + z * z);
 
-                if (distance <= radius && pRandom.nextFloat() < 0.3f) { // 30% chance for sparse undergrowth
+                if (distance <= radius && pRandom.nextFloat() < 0.3f) {
+                    shouldPlaceLeaf[x + radius][z + radius] = true;
+                }
+            }
+        }
+
+        // Ensure connectivity for undercanopy leaves
+        ensureLeafConnectivity(shouldPlaceLeaf, radius);
+
+        // Place the connected leaves
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                if (shouldPlaceLeaf[x + radius][z + radius]) {
                     net.minecraft.core.BlockPos leafPos = centerPos.offset(x, 0, z);
-                    this.tryPlaceLeaf(pLevel, pBlockSetter, pRandom, pConfig, leafPos);
+                    tryPlaceLeaf(pLevel, pBlockSetter, pRandom, pConfig, leafPos);
                 }
             }
         }
@@ -390,23 +439,19 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
 
     @Override
     public int foliageHeight(RandomSource pRandom, int pHeight, TreeConfiguration pConfig) {
-        // Return realistic foliage height based on tree characteristics
         int baseHeight = Math.max(MIN_FOLIAGE_HEIGHT, this.height);
         return Math.min(MAX_FOLIAGE_HEIGHT, baseHeight + pRandom.nextInt(3));
     }
 
     @Override
     protected boolean shouldSkipLocation(RandomSource pRandom, int pLocalX, int pLocalY, int pLocalZ, int pRange, boolean pLarge) {
-        // Custom skip logic for more natural, dense canopy
         double distance = Math.sqrt(pLocalX * pLocalX + pLocalZ * pLocalZ);
         double maxDistance = pRange + (pRandom.nextFloat() - 0.5f) * 1.5;
 
-        // Less skipping for dense ebony canopy, but some variation for naturalness
         if (distance > maxDistance) {
             return true;
         }
 
-        // Very rarely skip interior locations to maintain density
-        return pRandom.nextFloat() < 0.05f; // Only 5% skip chance for interior
+        return pRandom.nextFloat() < 0.05f;
     }
 }

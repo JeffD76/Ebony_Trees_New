@@ -9,6 +9,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.LevelSimulatedReader;
 import net.minecraft.world.level.block.RotatedPillarBlock;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.feature.configurations.TreeConfiguration;
 import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
@@ -17,21 +18,23 @@ import net.minecraft.world.level.levelgen.feature.trunkplacers.TrunkPlacerType;
 
 import java.util.List;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 public class EbonyTrunkPlacer extends TrunkPlacer {
 
     public static final Codec<EbonyTrunkPlacer> CODEC = RecordCodecBuilder.create(ebonyTrunkPlacerInstance ->
             trunkPlacerParts(ebonyTrunkPlacerInstance).apply(ebonyTrunkPlacerInstance, EbonyTrunkPlacer::new));
 
-    // Realistic ebony tree variables based on Diospyros ebenum characteristics
-    private static final int MIN_TREE_HEIGHT = 10; // Minimum realistic height
-    private static final int MAX_TREE_HEIGHT = 18; // Maximum realistic height
-    private static final int TRUNK_THICKNESS_HEIGHT = 6; // Height where trunk stays thick
-    private static final float BUTTRESS_CHANCE = 0.7f; // 70% chance for buttressed base
-    private static final int BUTTRESS_HEIGHT = 4; // Height of buttressed section
-    private static final float BRANCH_CHANCE = 0.15f; // Low branching chance (ebony has minimal lower branching)
-    private static final int MIN_BRANCH_HEIGHT = 12; // Branches only start higher up
+    // Realistic ebony tree variables
+    private static final int MIN_TREE_HEIGHT = 10;
+    private static final int MAX_TREE_HEIGHT = 18;
+    private static final int TRUNK_THICKNESS_HEIGHT = 6;
+    private static final float BUTTRESS_CHANCE = 0.8f;
+    private static final int BUTTRESS_HEIGHT = 4;
+    private static final float BRANCH_CHANCE = 0.05f;
+    private static final int MIN_BRANCH_HEIGHT = 12;
+
+    // Pre-calculated directions to avoid repeated array creation
+    private static final Direction[] HORIZONTAL_DIRECTIONS = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
 
     public EbonyTrunkPlacer(int pBaseHeight, int pHeightRandA, int pHeightRandB) {
         super(pBaseHeight, pHeightRandA, pHeightRandB);
@@ -48,58 +51,87 @@ public class EbonyTrunkPlacer extends TrunkPlacer {
         // Set dirt foundation
         setDirtAt(pLevel, pBlockSetter, pRandom, pPos.below(), pConfig);
 
-        // Calculate realistic ebony tree height (15-28 blocks)
-        int baseTreeHeight = Math.max(MIN_TREE_HEIGHT, Math.min(MAX_TREE_HEIGHT,
-                pFreeTreeHeight + pRandom.nextInt(heightRandA) + pRandom.nextInt(heightRandB)));
+        // Calculate realistic height with simplified logic
+        int baseTrunkHeight = calculateTreeHeight(pFreeTreeHeight, pRandom);
 
-        // Add slight height variation
-        int finalHeight = baseTreeHeight + pRandom.nextInt(-2, 3);
-        finalHeight = Math.max(MIN_TREE_HEIGHT, Math.min(MAX_TREE_HEIGHT, finalHeight));
+        // Extend trunk 3-4 blocks into canopy
+        int trunkExtension = 3 + pRandom.nextInt(2); // 3-4 blocks
+        int totalTrunkHeight = baseTrunkHeight + trunkExtension;
 
-        // Create buttressed base (characteristic of ebony trees)
+        // Pre-determine features to avoid repeated random calls
         boolean hasButtress = pRandom.nextFloat() < BUTTRESS_CHANCE;
 
-        for(int i = 0; i < finalHeight; i++) {
+        // Single trunk building loop with integrated features
+        for (int i = 0; i < totalTrunkHeight; i++) {
+            BlockPos currentPos = pPos.above(i);
+
             // Place main trunk
-            placeLog(pLevel, pBlockSetter, pRandom, pPos.above(i), pConfig);
+            placeLog(pLevel, pBlockSetter, pRandom, currentPos, pConfig);
 
-            // Create buttressed base for realism
-            if (hasButtress && i <= BUTTRESS_HEIGHT) {
-                createButtressedBase(pLevel, pBlockSetter, pRandom, pPos.above(i), pConfig, i, BUTTRESS_HEIGHT);
-            }
-
-            // Add thick trunk section (ebony trees have notably wide trunks)
-            if (i <= TRUNK_THICKNESS_HEIGHT && i > 0) {
-                addTrunkThickness(pLevel, pBlockSetter, pRandom, pPos.above(i), pConfig, i);
-            }
-
-            // Minimal branching in lower sections (realistic for ebony)
-            if (i >= MIN_BRANCH_HEIGHT && i % 3 == 0 && pRandom.nextFloat() < BRANCH_CHANCE) {
-                addMinimalBranches(pLevel, pBlockSetter, pRandom, pPos.above(i), pConfig);
+            // Apply trunk features based on height (only for base trunk, not extension)
+            if (i < baseTrunkHeight) {
+                applyTrunkFeatures(pLevel, pBlockSetter, pRandom, currentPos, pConfig, i, hasButtress);
             }
         }
 
-        // Return foliage attachment point at the top
-        return ImmutableList.of(new FoliagePlacer.FoliageAttachment(pPos.above(finalHeight), 0, false));
+        // Return foliage attachment at the base trunk height (where canopy starts)
+        // The extended trunk will be inside the canopy
+        return ImmutableList.of(new FoliagePlacer.FoliageAttachment(pPos.above(baseTrunkHeight), 0, false));
     }
 
     /**
-     * Creates a buttressed base characteristic of mature ebony trees
+     * Simplified height calculation
      */
-    private void createButtressedBase(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
-                                      RandomSource pRandom, BlockPos pPos, TreeConfiguration pConfig,
-                                      int currentHeight, int buttressMaxHeight) {
+    private int calculateTreeHeight(int pFreeTreeHeight, RandomSource pRandom) {
+        int baseHeight = Math.max(MIN_TREE_HEIGHT, Math.min(MAX_TREE_HEIGHT,
+                pFreeTreeHeight + pRandom.nextInt(heightRandA) + pRandom.nextInt(heightRandB)));
 
-        // Buttress intensity decreases with height
-        float buttressStrength = 1.0f - ((float) currentHeight / buttressMaxHeight);
+        // Add variation and clamp in one operation
+        return Math.max(MIN_TREE_HEIGHT, Math.min(MAX_TREE_HEIGHT,
+                baseHeight + pRandom.nextInt(-2, 3)));
+    }
+
+    /**
+     * Unified method to apply all trunk features based on height
+     */
+    private void applyTrunkFeatures(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
+                                    RandomSource pRandom, BlockPos pPos, TreeConfiguration pConfig,
+                                    int currentHeight, boolean hasButtress) {
+
+        // Buttressed base
+        if (hasButtress && currentHeight <= BUTTRESS_HEIGHT) {
+            addButtressFeatures(pLevel, pBlockSetter, pRandom, pPos, pConfig, currentHeight);
+        }
+
+        // Trunk thickness (skip height 0 to avoid ground level thickness)
+        if (currentHeight > 0 && currentHeight <= TRUNK_THICKNESS_HEIGHT) {
+            addTrunkThickness(pLevel, pBlockSetter, pRandom, pPos, pConfig, currentHeight);
+        }
+
+        // Minimal branching
+        if (currentHeight >= MIN_BRANCH_HEIGHT && currentHeight % 3 == 0 &&
+                pRandom.nextFloat() < BRANCH_CHANCE) {
+            addMinimalBranches(pLevel, pBlockSetter, pRandom, pPos, pConfig);
+        }
+    }
+
+    /**
+     * Optimized buttress creation with reduced calculations
+     */
+    private void addButtressFeatures(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
+                                     RandomSource pRandom, BlockPos pPos, TreeConfiguration pConfig, int currentHeight) {
+
+        // Pre-calculate buttress strength once
+        float buttressStrength = 1.0f - ((float) currentHeight / BUTTRESS_HEIGHT);
 
         if (buttressStrength > 0.3f && pRandom.nextFloat() < buttressStrength) {
-            // Add buttress extensions in cardinal directions
-            Direction[] horizontalDirections = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
-            for (Direction direction : horizontalDirections) {
-                if (pRandom.nextFloat() < buttressStrength * 0.8f) {
+            float placementChance = buttressStrength * 0.8f;
+
+            // Efficient direction iteration
+            for (Direction direction : HORIZONTAL_DIRECTIONS) {
+                if (pRandom.nextFloat() < placementChance) {
                     BlockPos buttressPos = pPos.relative(direction);
-                    if (isReplaceable(pLevel, buttressPos)) {
+                    if (pLevel.isStateAtPosition(buttressPos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
                         placeLog(pLevel, pBlockSetter, pRandom, buttressPos, pConfig);
                     }
                 }
@@ -108,64 +140,74 @@ public class EbonyTrunkPlacer extends TrunkPlacer {
     }
 
     /**
-     * Adds trunk thickness characteristic of ebony trees
+     * Optimized trunk thickness with smarter direction selection
      */
     private void addTrunkThickness(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
                                    RandomSource pRandom, BlockPos pPos, TreeConfiguration pConfig, int height) {
 
-        // Trunk gets slightly thinner as it goes up
-        float thicknessChance = 0.9f - (height * 0.05f);
+        float thicknessChance = 0.8f - (height * 0.05f);
 
         if (pRandom.nextFloat() < thicknessChance) {
-            // Randomly add thickness in one or two directions to avoid perfect squares
-            Direction[] horizontalDirections = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
-            Direction chosenDir = horizontalDirections[pRandom.nextInt(horizontalDirections.length)];
+            // Select random direction once
+            Direction chosenDir = HORIZONTAL_DIRECTIONS[pRandom.nextInt(4)];
 
-            BlockPos thickPos = pPos.relative(chosenDir);
-            if (isReplaceable(pLevel, thickPos)) {
-                placeLog(pLevel, pBlockSetter, pRandom, thickPos, pConfig);
-            }
-
-            // Sometimes add opposite direction for more natural thickness
-            if (pRandom.nextFloat() < 0.4f) {
-                Direction opposite = chosenDir.getOpposite();
-                BlockPos oppositePos = pPos.relative(opposite);
-                if (isReplaceable(pLevel, oppositePos)) {
-                    placeLog(pLevel, pBlockSetter, pRandom, oppositePos, pConfig);
+            // Try to place primary thickness
+            if (tryPlaceLogAt(pLevel, pBlockSetter, pRandom, pPos.relative(chosenDir), pConfig)) {
+                // 40% chance for opposite direction thickness
+                if (pRandom.nextFloat() < 0.4f) {
+                    tryPlaceLogAt(pLevel, pBlockSetter, pRandom, pPos.relative(chosenDir.getOpposite()), pConfig);
                 }
             }
         }
     }
 
     /**
-     * Adds minimal branching typical of ebony trees (mostly in upper sections)
+     * Streamlined minimal branching
      */
     private void addMinimalBranches(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
                                     RandomSource pRandom, BlockPos pPos, TreeConfiguration pConfig) {
 
-        // Only add 1-2 small branches occasionally
         int branchCount = pRandom.nextInt(3); // 0, 1, or 2 branches
 
         for (int b = 0; b < branchCount; b++) {
-            Direction[] horizontalDirections = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
-            Direction direction = horizontalDirections[pRandom.nextInt(horizontalDirections.length)];
-            int branchLength = pRandom.nextInt(2, 4); // Short branches (2-3 blocks)
+            Direction direction = HORIZONTAL_DIRECTIONS[pRandom.nextInt(4)];
+            int branchLength = pRandom.nextInt(2, 4); // 2-3 blocks
 
-            for (int j = 1; j <= branchLength; j++) {
-                BlockPos branchPos = pPos.relative(direction, j);
-                if (isReplaceable(pLevel, branchPos)) {
-                    BlockState branchState = pConfig.trunkProvider.getState(pRandom, branchPos)
-                            .setValue(RotatedPillarBlock.AXIS, direction.getAxis());
-                    pBlockSetter.accept(branchPos, branchState);
-                }
+            // Create branch in single direction
+            createBranchInDirection(pLevel, pBlockSetter, pRandom, pPos, pConfig, direction, branchLength);
+        }
+    }
+
+    /**
+     * Optimized branch creation in specific direction
+     */
+    private void createBranchInDirection(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
+                                         RandomSource pRandom, BlockPos startPos, TreeConfiguration pConfig,
+                                         Direction direction, int length) {
+
+        // Pre-calculate branch state with correct axis
+        BlockState branchTemplate = pConfig.trunkProvider.getState(pRandom, startPos)
+                .setValue(RotatedPillarBlock.AXIS, direction.getAxis());
+
+        for (int j = 1; j <= length; j++) {
+            BlockPos branchPos = startPos.relative(direction, j);
+            if (pLevel.isStateAtPosition(branchPos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
+                pBlockSetter.accept(branchPos, branchTemplate);
+            } else {
+                break; // Stop if we hit an obstacle
             }
         }
     }
 
     /**
-     * Helper method to check if a position can be replaced
+     * Helper method that combines replaceability check and placement
      */
-    private boolean isReplaceable(LevelSimulatedReader pLevel, BlockPos pPos) {
-        return pLevel.isStateAtPosition(pPos, state -> state.canBeReplaced());
+    private boolean tryPlaceLogAt(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
+                                  RandomSource pRandom, BlockPos pos, TreeConfiguration pConfig) {
+        if (pLevel.isStateAtPosition(pos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
+            placeLog(pLevel, pBlockSetter, pRandom, pos, pConfig);
+            return true;
+        }
+        return false;
     }
 }
