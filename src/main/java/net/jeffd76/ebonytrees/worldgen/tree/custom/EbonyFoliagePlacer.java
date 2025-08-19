@@ -17,10 +17,10 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
                     .forGetter(fp -> fp.height)).apply(ebonyFoliagePlacerInstance, EbonyFoliagePlacer::new));
 
     // Realistic ebony tree foliage variables
-    private static final int MIN_FOLIAGE_HEIGHT = 6;
-    private static final int MAX_FOLIAGE_HEIGHT = 12;
-    private static final int MIN_RADIUS = 5;
-    private static final int MAX_RADIUS = 8;
+    private static final int MIN_FOLIAGE_HEIGHT = 8;
+    private static final int MAX_FOLIAGE_HEIGHT = 10;
+    private static final int MIN_RADIUS = 4;
+    private static final int MAX_RADIUS = 7;
     private static final float DENSITY_FACTOR = 0.9f;
 
     private final int height;
@@ -60,9 +60,6 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
                     layerPos, currentRadius);
         }
 
-        // Connect lower canopy branches to main trunk with diagonal supports
-        connectBranchesToTrunk(pLevel, pBlockSetter, pRandom, pConfig, branchPositions,
-                pAttachment.pos(), pOffset);
 
         // Cover any exposed branches in upper 3/4 of canopy
         coverExposedBranches(pLevel, pBlockSetter, pRandom, pConfig, branchPositions
@@ -100,7 +97,7 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
 
         // Create branches for this layer - single pass only
         createBranches(pLevel, pBlockSetter, pRandom, pConfig, layerCenter,
-                radius, layer, totalHeight, branchCount, false, branchPositions);
+                radius, layer, totalHeight, branchCount, branchPositions);
     }
 
     /**
@@ -108,7 +105,7 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
      */
     private void createBranches(LevelSimulatedReader pLevel, FoliageSetter pBlockSetter, RandomSource pRandom,
                                 TreeConfiguration pConfig, net.minecraft.core.BlockPos layerCenter,
-                                int radius, int layer, int totalHeight, int branchCount, boolean isDenseMode,
+                                int radius, int layer, int totalHeight, int branchCount,
                                 java.util.Set<net.minecraft.core.BlockPos> branchPositions) {
 
         // Pre-calculate all values to avoid repeated calculations
@@ -328,12 +325,11 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
     /**
      * Ensures leaf connectivity by filling gaps between leaf clusters
      */
-    private void ensureLeafConnectivity(boolean[][] shouldPlaceLeaf, int radius) {
-        int size = radius * 2 + 1;
+    private void ensureLeafConnectivity(boolean[][] shouldPlaceLeaf, int centerIdx) {
+        int size = centerIdx * 2 + 1;
         boolean[][] connected = new boolean[size][size];
 
         // Mark center area as connected (trunk area)
-        int centerIdx = radius;
         for (int x = Math.max(0, centerIdx - 1); x <= Math.min(size - 1, centerIdx + 1); x++) {
             for (int z = Math.max(0, centerIdx - 1); z <= Math.min(size - 1, centerIdx + 1); z++) {
                 connected[x][z] = true;
@@ -366,15 +362,15 @@ public class EbonyFoliagePlacer extends FoliagePlacer {
                 if (!shouldPlaceLeaf[x][z]) {
                     // Check if placing a leaf here would connect isolated areas
                     int connectedNeighbors = 0;
-                    if (x > 0 && connected[x-1][z]) connectedNeighbors++;
+                    if (connected[x-1][z]) connectedNeighbors++;
                     if (x < size-1 && connected[x+1][z]) connectedNeighbors++;
-                    if (z > 0 && connected[x][z-1]) connectedNeighbors++;
+                    if (connected[x][z-1]) connectedNeighbors++;
                     if (z < size-1 && connected[x][z+1]) connectedNeighbors++;
 
                     // If this position would connect multiple areas or fill a small gap
                     if (connectedNeighbors >= 2) {
                         double distanceFromCenter = Math.sqrt(Math.pow(x - centerIdx, 2) + Math.pow(z - centerIdx, 2));
-                        if (distanceFromCenter <= radius) { // Only within canopy bounds
+                        if (distanceFromCenter <= centerIdx) { // Only within canopy bounds
                             shouldPlaceLeaf[x][z] = true;
                             connected[x][z] = true;
                         }

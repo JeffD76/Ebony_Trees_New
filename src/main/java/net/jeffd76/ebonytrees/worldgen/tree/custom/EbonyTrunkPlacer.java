@@ -25,16 +25,37 @@ public class EbonyTrunkPlacer extends TrunkPlacer {
             trunkPlacerParts(ebonyTrunkPlacerInstance).apply(ebonyTrunkPlacerInstance, EbonyTrunkPlacer::new));
 
     // Realistic ebony tree variables
-    private static final int MIN_TREE_HEIGHT = 10;
-    private static final int MAX_TREE_HEIGHT = 18;
-    private static final int TRUNK_THICKNESS_HEIGHT = 6;
-    private static final float BUTTRESS_CHANCE = 0.8f;
-    private static final int BUTTRESS_HEIGHT = 4;
+    private static final int MIN_TREE_HEIGHT = 8;
+    private static final int MAX_TREE_HEIGHT = 16;
+    private static final float BUTTRESS_CHANCE = 1.0f; // Always create buttresses
+    private static final int MIN_BUTTRESS_HEIGHT = 1;
+    private static final int MAX_BUTTRESS_HEIGHT = 4;
     private static final float BRANCH_CHANCE = 0.05f;
     private static final int MIN_BRANCH_HEIGHT = 12;
 
+    // Top buttress variables
+    private static final float TOP_BUTTRESS_CHANCE = 1.0f; // 75% chance per direction
+    private static final int MIN_TOP_BUTTRESS_LENGTH = 2;
+    private static final int MAX_TOP_BUTTRESS_LENGTH = 3;
+
+    // Root system variables
+    private static final float ROOT_CHANCE = 0.8f; // Increased to 100% for testing
+    private static final float DIAGONAL_ROOT_CHANCE = 0.25f; // 25% chance for diagonal roots
+    private static final int MAX_ROOT_DEPTH = 2;
+    private static final int MAX_ROOT_LENGTH = 2;
+
     // Pre-calculated directions to avoid repeated array creation
     private static final Direction[] HORIZONTAL_DIRECTIONS = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
+
+    // Diagonal directions for root placement
+    private static final Direction[][] DIAGONAL_DIRECTIONS = {
+            {Direction.NORTH, Direction.EAST}, // Northeast
+            {Direction.NORTH, Direction.WEST}, // Northwest
+            {Direction.SOUTH, Direction.EAST}, // Southeast
+            {Direction.SOUTH, Direction.WEST}  // Southwest
+    };
+
+    // Flag to check if we're in world generation context (will be determined dynamically)
 
     public EbonyTrunkPlacer(int pBaseHeight, int pHeightRandA, int pHeightRandB) {
         super(pBaseHeight, pHeightRandA, pHeightRandB);
@@ -48,8 +69,17 @@ public class EbonyTrunkPlacer extends TrunkPlacer {
     @Override
     public List<FoliagePlacer.FoliageAttachment> placeTrunk(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
                                                             RandomSource pRandom, int pFreeTreeHeight, BlockPos pPos, TreeConfiguration pConfig) {
+        // Determine if this is world generation or sapling growth
+        // World generation typically has larger free tree heights and uses LevelSimulatedReader
+        boolean isWorldGen = determineWorldGenContext(pLevel, pFreeTreeHeight);
+
         // Set dirt foundation
         setDirtAt(pLevel, pBlockSetter, pRandom, pPos.below(), pConfig);
+
+        // Add root system only for world generation (not sapling growth)
+        if (isWorldGen) {
+            addRoots(pRandom, pPos, pBlockSetter, pConfig, HORIZONTAL_DIRECTIONS, true);
+        }
 
         // Calculate realistic height with simplified logic
         int baseTrunkHeight = calculateTreeHeight(pFreeTreeHeight, pRandom);
@@ -61,6 +91,23 @@ public class EbonyTrunkPlacer extends TrunkPlacer {
         // Pre-determine features to avoid repeated random calls
         boolean hasButtress = pRandom.nextFloat() < BUTTRESS_CHANCE;
 
+        // Generate individual buttress heights for each direction (1-4 blocks each)
+        int[] buttressHeights = new int[HORIZONTAL_DIRECTIONS.length];
+        for (int i = 0; i < HORIZONTAL_DIRECTIONS.length; i++) {
+            buttressHeights[i] = MIN_BUTTRESS_HEIGHT + pRandom.nextInt(MAX_BUTTRESS_HEIGHT - MIN_BUTTRESS_HEIGHT + 1);
+        }
+
+        // Pre-generate top buttress configurations
+        boolean[] hasTopButtress = new boolean[HORIZONTAL_DIRECTIONS.length];
+        int[] topButtressLengths = new int[HORIZONTAL_DIRECTIONS.length];
+        for (int i = 0; i < HORIZONTAL_DIRECTIONS.length; i++) {
+            hasTopButtress[i] = pRandom.nextFloat() < TOP_BUTTRESS_CHANCE;
+            if (hasTopButtress[i]) {
+                topButtressLengths[i] = MIN_TOP_BUTTRESS_LENGTH +
+                        pRandom.nextInt(MAX_TOP_BUTTRESS_LENGTH - MIN_TOP_BUTTRESS_LENGTH + 1);
+            }
+        }
+
         // Single trunk building loop with integrated features
         for (int i = 0; i < totalTrunkHeight; i++) {
             BlockPos currentPos = pPos.above(i);
@@ -70,13 +117,182 @@ public class EbonyTrunkPlacer extends TrunkPlacer {
 
             // Apply trunk features based on height (only for base trunk, not extension)
             if (i < baseTrunkHeight) {
-                applyTrunkFeatures(pLevel, pBlockSetter, pRandom, currentPos, pConfig, i, hasButtress);
+                applyTrunkFeatures(pLevel, pBlockSetter, pRandom, currentPos, pConfig, i, hasButtress, buttressHeights);
+
+                // Place top buttresses in the upper portion of the trunk (last 3 blocks before foliage)
+                if (i >= baseTrunkHeight - 10) {
+                    addTopButtressesAtHeight(pLevel, pBlockSetter, pRandom, currentPos, pConfig,
+                            hasTopButtress, topButtressLengths, baseTrunkHeight - i);
+                }
             }
         }
 
         // Return foliage attachment at the base trunk height (where canopy starts)
         // The extended trunk will be inside the canopy
         return ImmutableList.of(new FoliagePlacer.FoliageAttachment(pPos.above(baseTrunkHeight), 0, false));
+    }
+
+    /**
+     * Determines if we're in world generation context vs sapling growth
+     */
+    private boolean determineWorldGenContext(LevelSimulatedReader pLevel, int pFreeTreeHeight) {
+        // Multiple indicators can help determine the context:
+
+        // 1. World generation typically has much larger free tree heights
+        if (pFreeTreeHeight > 20) {
+            return true; // Very likely world generation
+        }
+
+        // 2. Sapling growth usually has smaller, more constrained heights
+        if (pFreeTreeHeight < 8) {
+            return false; // Very likely sapling growth
+        }
+
+        // 3. Check the type of LevelSimulatedReader
+        // World generation often uses specific reader types
+        String readerClassName = pLevel.getClass().getSimpleName();
+
+        // Common world generation reader classes
+        if (readerClassName.contains("WorldGen") ||
+                readerClassName.contains("ChunkGenerator") ||
+                readerClassName.contains("FeaturePlaceContext")) {
+            return true;
+        }
+
+        // Common sapling growth reader classes
+        if (readerClassName.contains("Level") && !readerClassName.contains("Simulated")) {
+            return false;
+        }
+
+        // Default assumption based on height for edge cases
+        return pFreeTreeHeight >= 12;
+    }
+
+    /**
+     * Adds a root system beneath the tree
+     */
+    public void addRoots(RandomSource rand, BlockPos pos,
+                         BiConsumer<BlockPos, BlockState> consumer, TreeConfiguration baseTreeFeatureConfig,
+                         Direction[] extendedDirs, boolean isWorldGen) {
+        BlockState rootState = baseTreeFeatureConfig.trunkProvider.getState(rand, pos);
+
+        if (rand.nextFloat() < ROOT_CHANCE) {
+            // Start placing roots from below the trunk base
+            BlockPos rootStartPos = pos.below();
+
+            // Place initial root block
+            consumer.accept(rootStartPos, rootState);
+
+            if (isWorldGen) {
+                // Extend roots downward (up to MAX_ROOT_DEPTH blocks)
+                BlockPos currentPos = rootStartPos;
+                for (int i = 0; i < MAX_ROOT_DEPTH; i++) {
+                    currentPos = currentPos.below();
+                    consumer.accept(currentPos, rootState);
+                }
+
+                // Add lateral roots extending from various depths
+                for (Direction direction : extendedDirs) {
+                    // Place roots at different depths for more natural look
+                    placeRotatedRoot(rand, rootStartPos.relative(direction),
+                            consumer, baseTreeFeatureConfig, direction);
+
+                    // Sometimes add deeper lateral roots
+                    if (rand.nextFloat() < 0.6f) {
+                        placeRotatedRoot(rand, rootStartPos.below().relative(direction),
+                                consumer, baseTreeFeatureConfig, direction);
+                    }
+                }
+
+                // Add diagonal roots with 25% chance each
+                for (Direction[] diagonalPair : DIAGONAL_DIRECTIONS) {
+                    if (rand.nextFloat() < DIAGONAL_ROOT_CHANCE) {
+                        placeDiagonalRoot(rand, rootStartPos, consumer, baseTreeFeatureConfig, diagonalPair);
+                    }
+                }
+
+            }
+        }
+
+    }
+
+    /**
+     * Places a root extending in a specific direction
+     */
+    private void placeRotatedRoot(RandomSource rand, BlockPos startPos,
+                                  BiConsumer<BlockPos, BlockState> consumer, TreeConfiguration config,
+                                  Direction direction) {
+        // Create root state with proper axis alignment
+        BlockState rootState = config.trunkProvider.getState(rand, startPos)
+                .setValue(RotatedPillarBlock.AXIS, direction.getAxis());
+
+        // Extend root 1-3 blocks in the given direction
+        int rootLength = 1 + rand.nextInt(MAX_ROOT_LENGTH);
+
+        for (int i = 1; i <= rootLength; i++) {
+            BlockPos rootPos = startPos.relative(direction, i);
+
+            // Place root block - be less restrictive about placement
+            consumer.accept(rootPos, rootState);
+
+            // Occasionally place a root going down from lateral roots
+            if (i == rootLength && rand.nextFloat() < 0.4f) {
+                BlockPos deeperRoot = rootPos.below();
+                consumer.accept(deeperRoot, rootState);
+            }
+        }
+    }
+
+    /**
+     * Adds top buttresses at specific height during trunk building
+     */
+    private void addTopButtressesAtHeight(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
+                                          RandomSource pRandom, BlockPos currentPos, TreeConfiguration pConfig,
+                                          boolean[] hasTopButtress, int[] topButtressLengths, int remainingHeight) {
+
+        // Check each direction for top buttress placement
+        for (int dirIndex = 0; dirIndex < HORIZONTAL_DIRECTIONS.length; dirIndex++) {
+            if (hasTopButtress[dirIndex] && remainingHeight <= topButtressLengths[dirIndex]) {
+                Direction direction = HORIZONTAL_DIRECTIONS[dirIndex];
+                BlockPos buttressPos = currentPos.relative(direction);
+
+                // Place buttress block if position is suitable
+                if (pLevel.isStateAtPosition(buttressPos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
+                    placeLog(pLevel, pBlockSetter, pRandom, buttressPos, pConfig);
+                }
+            }
+        }
+    }
+
+
+
+    /**
+     * Places a diagonal root extending in two directions (e.g., northeast, southwest)
+     */
+    private void placeDiagonalRoot(RandomSource rand, BlockPos startPos,
+                                   BiConsumer<BlockPos, BlockState> consumer, TreeConfiguration config,
+                                   Direction[] diagonalPair) {
+        // Create root state - use the first direction's axis for consistency
+        BlockState rootState = config.trunkProvider.getState(rand, startPos)
+                .setValue(RotatedPillarBlock.AXIS, diagonalPair[0].getAxis());
+
+        // Diagonal root length is typically shorter (1-2 blocks)
+        int rootLength = 1 + rand.nextInt(2);
+
+        BlockPos currentPos = startPos;
+        for (int i = 1; i <= rootLength; i++) {
+            // Move diagonally by applying both directions
+            currentPos = currentPos.relative(diagonalPair[0]).relative(diagonalPair[1]);
+
+            // Place root block
+            consumer.accept(currentPos, rootState);
+
+            // Occasionally place a root going down from the diagonal root tip
+            if (i == rootLength && rand.nextFloat() < 0.3f) {
+                BlockPos deeperRoot = currentPos.below();
+                consumer.accept(deeperRoot, rootState);
+            }
+        }
     }
 
     /**
@@ -96,16 +312,11 @@ public class EbonyTrunkPlacer extends TrunkPlacer {
      */
     private void applyTrunkFeatures(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
                                     RandomSource pRandom, BlockPos pPos, TreeConfiguration pConfig,
-                                    int currentHeight, boolean hasButtress) {
+                                    int currentHeight, boolean hasButtress, int[] buttressHeights) {
 
-        // Buttressed base
-        if (hasButtress && currentHeight <= BUTTRESS_HEIGHT) {
-            addButtressFeatures(pLevel, pBlockSetter, pRandom, pPos, pConfig, currentHeight);
-        }
-
-        // Trunk thickness (skip height 0 to avoid ground level thickness)
-        if (currentHeight > 0 && currentHeight <= TRUNK_THICKNESS_HEIGHT) {
-            addTrunkThickness(pLevel, pBlockSetter, pRandom, pPos, pConfig, currentHeight);
+        // Buttressed base - now with individual heights per direction
+        if (hasButtress) {
+            addButtressFeatures(pLevel, pBlockSetter, pRandom, pPos, pConfig, currentHeight, buttressHeights);
         }
 
         // Minimal branching
@@ -116,46 +327,22 @@ public class EbonyTrunkPlacer extends TrunkPlacer {
     }
 
     /**
-     * Optimized buttress creation with reduced calculations
+     * Enhanced buttress creation with individual heights per direction
      */
     private void addButtressFeatures(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
-                                     RandomSource pRandom, BlockPos pPos, TreeConfiguration pConfig, int currentHeight) {
+                                     RandomSource pRandom, BlockPos pPos, TreeConfiguration pConfig,
+                                     int currentHeight, int[] buttressHeights) {
 
-        // Pre-calculate buttress strength once
-        float buttressStrength = 1.0f - ((float) currentHeight / BUTTRESS_HEIGHT);
+        // Check each direction individually with its own height
+        for (int dirIndex = 0; dirIndex < HORIZONTAL_DIRECTIONS.length; dirIndex++) {
+            Direction direction = HORIZONTAL_DIRECTIONS[dirIndex];
+            int buttressHeight = buttressHeights[dirIndex];
 
-        if (buttressStrength > 0.3f && pRandom.nextFloat() < buttressStrength) {
-            float placementChance = buttressStrength * 0.8f;
-
-            // Efficient direction iteration
-            for (Direction direction : HORIZONTAL_DIRECTIONS) {
-                if (pRandom.nextFloat() < placementChance) {
-                    BlockPos buttressPos = pPos.relative(direction);
-                    if (pLevel.isStateAtPosition(buttressPos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
-                        placeLog(pLevel, pBlockSetter, pRandom, buttressPos, pConfig);
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Optimized trunk thickness with smarter direction selection
-     */
-    private void addTrunkThickness(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
-                                   RandomSource pRandom, BlockPos pPos, TreeConfiguration pConfig, int height) {
-
-        float thicknessChance = 0.8f - (height * 0.05f);
-
-        if (pRandom.nextFloat() < thicknessChance) {
-            // Select random direction once
-            Direction chosenDir = HORIZONTAL_DIRECTIONS[pRandom.nextInt(4)];
-
-            // Try to place primary thickness
-            if (tryPlaceLogAt(pLevel, pBlockSetter, pRandom, pPos.relative(chosenDir), pConfig)) {
-                // 40% chance for opposite direction thickness
-                if (pRandom.nextFloat() < 0.4f) {
-                    tryPlaceLogAt(pLevel, pBlockSetter, pRandom, pPos.relative(chosenDir.getOpposite()), pConfig);
+            // Only place buttress if current height is within this direction's buttress height
+            if (currentHeight < buttressHeight) {
+                BlockPos buttressPos = pPos.relative(direction);
+                if (pLevel.isStateAtPosition(buttressPos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
+                    placeLog(pLevel, pBlockSetter, pRandom, buttressPos, pConfig);
                 }
             }
         }
@@ -197,17 +384,5 @@ public class EbonyTrunkPlacer extends TrunkPlacer {
                 break; // Stop if we hit an obstacle
             }
         }
-    }
-
-    /**
-     * Helper method that combines replaceability check and placement
-     */
-    private boolean tryPlaceLogAt(LevelSimulatedReader pLevel, BiConsumer<BlockPos, BlockState> pBlockSetter,
-                                  RandomSource pRandom, BlockPos pos, TreeConfiguration pConfig) {
-        if (pLevel.isStateAtPosition(pos, BlockBehaviour.BlockStateBase::canBeReplaced)) {
-            placeLog(pLevel, pBlockSetter, pRandom, pos, pConfig);
-            return true;
-        }
-        return false;
     }
 }

@@ -26,6 +26,7 @@ public class ModConfiguredFeatures {
                 BlockStateProvider.simple(ModBlocks.EBONY_LOG.get()),
                 new EbonyTrunkPlacer(12, 6, 4),
 
+
                 BlockStateProvider.simple(ModBlocks.EBONY_LEAVES.get()),
                 new EbonyFoliagePlacer(
                         UniformInt.of(7, 9),
